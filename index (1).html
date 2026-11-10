@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prueba PayGate</title>
+<style>
+  body{margin:0;min-height:100vh;display:grid;place-items:center;background:#2a0f6b;font-family:system-ui,sans-serif;color:#fff}
+  main{width:min(92vw,380px);display:grid;gap:14px}
+  input,button{font:inherit;padding:14px;border-radius:8px;border:0}
+  button{background:#fbd41d;color:#2a0f6b;font-weight:700;cursor:pointer}
+  #msg{min-height:1.4em;color:#ffb4b4}
+</style>
+</head>
+<body>
+<main>
+  <h1>Prueba PayGate</h1>
+  <input id="amount" type="number" min="2" step="0.01" value="4" aria-label="Monto en USD">
+  <input id="email" type="email" placeholder="tu@email.com" aria-label="Email">
+  <button id="pay">Pagar con tarjeta</button>
+  <div id="msg" role="alert"></div>
+</main>
+<script>
+document.getElementById("pay").onclick = async () => {
+  const msg = document.getElementById("msg");
+  msg.textContent = "";
+  const r = await fetch("/.netlify/functions/crear-pago", {
+    method: "POST",
+    body: JSON.stringify({
+      amount: document.getElementById("amount").value,
+      email: document.getElementById("email").value
+    })
+  });
+  const d = await r.json();
+  if (d.url) location.href = d.url; // redirección, no iframe
+  else msg.textContent = d.error || "No se pudo crear el pago";
+};
+</script>
+</body>
+</html>
