@@ -8,15 +8,38 @@ exports.handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: "Monto o email inválido" }) };
     }
 
-    const order = crypto.randomUUID();
-    const callback = `${process.env.SITE_URL}/.netlify/functions/callback?order=${order}`;
+    const api = (process.env.PAYGATE_API || "https://api.paygate.to").trim().replace(/\/$/, "");
+    const wallet = (process.env.WALLET_USDC || "").trim();
+    const site = (process.env.SITE_URL || "").trim().replace(/\/$/, "");
 
-    const r = await fetch(
-      `https://api.paygate.to/control/wallet.php?address=${process.env.WALLET_USDC}&callback=${encodeURIComponent(callback)}`
-    );
-    const data = await r.json();
+    const order = crypto.randomUUID();
+    const callback = `${site}/.netlify/functions/callback?order=${order}`;
+
+    const walletUrl =
+      `${api}/control/wallet.php?address=${encodeURIComponent(wallet)}&callback=${encodeURIComponent(callback)}`;
+
+    const r = await fetch(walletUrl, {
+      method: "GET",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; NetlifyFunction/1.0)",
+        "Accept": "application/json"
+      }
+    });
+    const texto = await r.text();
+
+    let data;
+    try {
+      data = JSON.parse(texto);
+    } catch (e) {
+      console.error("PayGate respondió algo que no es JSON:", r.status, texto.slice(0, 300));
+      return {
+        statusCode: 502,
+        body: JSON.stringify({ error: `PayGate respondió (${r.status}): ${texto.slice(0, 150)}` })
+      };
+    }
+
     if (!data.address_in) {
-      return { statusCode: 502, body: JSON.stringify({ error: "PayGate no devolvió address_in", data }) };
+      return { statusCode: 502, body: JSON.stringify({ error: "PayGate no devolvió address_in: " + JSON.stringify(data).slice(0, 200) }) };
     }
 
     const url =
@@ -26,6 +49,7 @@ exports.handler = async (event) => {
     console.log("PEDIDO CREADO", order, monto, email, "ipn_token:", data.ipn_token);
     return { statusCode: 200, body: JSON.stringify({ url, order }) };
   } catch (e) {
+    console.error(e);
     return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
   }
 };
